@@ -1,36 +1,9 @@
 import { WebView } from 'react-native-webview';
 import { View, Platform } from 'react-native';
 import React, { forwardRef, useRef, useState, useEffect } from 'react';
-import PinturaProxy from './bin/pintura.html';
+import { Asset } from 'expo-asset';
 
 const upperCaseFirstLetter = (str) => str.charAt(0).toUpperCase() + str.slice(1);
-
-// @deprecated
-// Converts a local file to a DataURL so there's no rights issue when loading the image
-export const localFileToDataURL = (url) =>
-    new Promise((resolve, reject) => {
-        // url to blob
-        fetch(url)
-            .then((res) => res.blob())
-            .then((blob) => {
-                // if mimetype missing fix
-                if (!blob.type) {
-                    const [path, _] = url.split('?');
-                    const ext = path.split('.').pop();
-                    blob = new Blob([blob], {
-                        type: 'image/' + ext,
-                        lastModified: Date.now(),
-                    });
-                }
-
-                // convert to dataURL
-                const fr = new FileReader();
-                fr.onload = () => resolve(fr.result);
-                fr.onerror = () => reject(fr.error);
-                fr.readAsDataURL(blob);
-            })
-            .catch(reject);
-    });
 
 // This allows passing functions to webview
 const getFunctionParts = (fn) => {
@@ -109,11 +82,14 @@ const Editor = forwardRef((props, ref) => {
 
     // load editor template
     useEffect(() => {
-        if (Platform.OS === 'android') {
-            setSource({ uri: 'file:///android_asset/pintura.html' });
-        } else {
-            setSource(PinturaProxy);
-        }
+        const template = require('./bin/pintura.html'); // eslint-disable-line no-undef
+        Platform.OS === 'android'
+            ? Asset.loadAsync(template).then(([{ localUri }]) => {
+                  setSource({
+                      uri: localUri,
+                  });
+              })
+            : setSource(template);
     }, []);
 
     return (
