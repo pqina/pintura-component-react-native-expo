@@ -1,0 +1,21 @@
+{
+    "name": "@pqina/react-native-expo-pintura",
+    "version": "9.0.0",
+    "description": "Pintura Image Editor Components for use with React Native Expo",
+    "author": "Rik Schennink at PQINA",
+    "homepage": "https://pqina.nl/pintura/",
+    "license": "https://pqina.nl/pintura/license/",
+    "main": "PinturaEditor.js",
+    "types": "PinturaEditor.d.ts",
+    "scripts": {
+        "postinstall": "node scripts/install"
+    },
+    "dependencies": {
+        "@pqina/pintura": "8.x"
+    },
+    "peerDependencies": {
+        "react": ">=18.x",
+        "react-native": "^0.x",
+        "react-native-webview": ">=11"
+    }
+}

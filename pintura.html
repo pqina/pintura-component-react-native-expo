@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Pintura Editor</title>
+        <!-- Pintura editor core styles -->
+        <style>
+            /*__PINTURA_CSS__*/
+
+            /*__PINTURA_VIDEO_CSS__*/
+        </style>
+        <!-- Styles for the base page -->
+        <style>
+            html {
+                font-family: sans-serif;
+                font-size: 16px;
+            }
+
+            html,
+            body {
+                padding: 0;
+                margin: 0;
+                height: 100%;
+            }
+
+            #app {
+                width: 100%;
+                height: 100%;
+            }
+        </style>
+        <!-- This will contain custom editor styles set through `styleRules` property on proxy component -->
+        <style id="editor-styles"></style>
+    </head>
+    <body>
+        <div id="app"></div>
+        <script>
+            // This replaces undefined values in outgoing messages so they're not lost
+            const stringifyMessage = (obj) =>
+                JSON.stringify(obj, (k, v) => (v === undefined ? '__UNDEFINED__' : v));
+
+            // This deep replaces object values with a replacer function
+            const deepReplaceValues = (obj, replacer) => {
+                let out = Array.isArray(obj) ? [...obj] : { ...obj };
+                Object.entries(out).forEach(([key, value]) => {
+                    if (Array.isArray(value) || typeof value === 'object') {
+                        out[key] = deepReplaceValues(value, replacer);
+                    } else {
+                        out[key] = replacer(key, value);
+                    }
+                });
+                return out;
+            };
+
+            // this restores undefined and function values
+            const replaceValues = (key, value) => {
+                // only replacing special strings, ignore reset
+                if (typeof value !== 'string') return value;
+
+                // should be set to undefined
+                if (value === '__UNDEFINED__') return undefined;
+
+                // is a function __FUNCTION__foo,bar,baz____body
+                if (value.startsWith('__FUNCTION__')) {
+                    const parts = value.substring(12).split('____');
+                    return new Function(parts[0], parts[1]);
+                }
+
+                return value;
+            };
+
+            const parseMessage = (str) => deepReplaceValues(JSON.parse(str), replaceValues);
+
+            // This enables using console.log for debugging
+            console.log = (...args) => {
+                if (!('ReactNativeWebView' in window)) return;
+                window.ReactNativeWebView.postMessage(
+                    stringifyMessage({ type: 'log', detail: args })
+                );
+            };
+
+            // Converts a Blob to a dataURL, with React Native we cannot send Blobs through window.postMessage
+            const toDateURI = (file) =>
+                new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+            // Converts an event object entry to a property (basically encodes any Blob values)
+            const toMessageProp = ([key, value]) =>
+                new Promise((resolve) => {
+                    if (value instanceof Blob) {
+                        toDateURI(value).then((str) => resolve([key, str]));
+                        return;
+                    }
+                    resolve([key, value]);
+                });
+
+            // All editor events are routed here so we can send them to the React Native layer
+            const handleEditorEvent = (type, detail) => {
+                // filter out data uri's from events so messages are faster
+                if (type === 'load') {
+                    // remove original image source
+                    delete detail.src;
+                    // remove resulting file object as used by editor
+                    delete detail.dest;
+                } else if (type === 'loadpreview') {
+                    // remove preview data
+                    detail = {};
+                } else if (type === 'process') {
+                    // remove source image
+                    delete detail.src;
+                }
+
+                // is plain string
+                if (typeof detail === 'string' || typeof detail === 'number') {
+                    window.ReactNativeWebView.postMessage(stringifyMessage({ type, detail }));
+                    return;
+                }
+
+                // create message for arrays and object
+                Promise.all(Object.entries(detail || {}).map(toMessageProp)).then((entries) => {
+                    const detail = entries.reduce((prev, [key, value]) => {
+                        prev[key] = value;
+                        return prev;
+                    }, {});
+
+                    let message;
+                    try {
+                        message = stringifyMessage({ type, detail });
+                    } catch (err) {
+                        alert(err);
+                        return;
+                    }
+
+                    window.ReactNativeWebView.postMessage(message);
+                });
+            };
+
+            // Go!
+            const initEditorProxy = () => {
+                // Default editor
+                const {
+                    setPlugins,
+                    appendDefaultEditor,
+                    createDefaultImageReader,
+                    createDefaultImageWriter,
+                    createDefaultMediaWriter,
+                    imageStateToCanvas,
+                } = pintura;
+
+                /*__PINTURA_VIDEO_INIT__*/
+
+                // Set properties that can't be set from the native layer in the object below
+                const editorCustomOptions = {
+                    //
+                    // Your properties here
+                    //
+                };
+
+                // Create the editor
+                const editor = appendDefaultEditor(window.app, {
+                    // merge custom options
+                    ...editorCustomOptions,
+
+                    /*__PINTURA_VIDEO_OPTIONS__*/
+
+                    // Route editor events to the React Native layer
+                    handleEvent: handleEditorEvent,
+                });
+
+                // Allow comms with editor from React Native layer
+                const handleMessage = (event) => {
+                    // parse options
+                    let msg;
+                    try {
+                        msg = parseMessage(event.data);
+                    } catch (err) {
+                        alert(err);
+                        return;
+                    }
+
+                    // is a `style` object, let's update the styles
+                    if (msg.editorStyleRules) {
+                        const styles = document.getElementById('editor-styles');
+                        styles.textContent = msg.editorStyleRules;
+                    }
+
+                    // is an `options` object? lets assign to editor
+                    if (msg.editorOptions) {
+                        if (msg.editorOptions.imageReader) {
+                            msg.editorOptions.imageReader = createDefaultImageReader(
+                                msg.editorOptions.imageReader
+                            );
+                        }
+
+                        if (msg.editorOptions.imageWriter) {
+                            msg.editorOptions.imageWriter = createDefaultImageWriter(
+                                msg.editorOptions.imageWriter
+                            );
+                        }
+
+                        /*__PINTURA_VIDEO_WRITER__*/
+
+                        return Object.assign(editor, msg.editorOptions);
+                    }
+
+                    // is a function perhaps, lets run it
+                    if (msg.editorFunction) {
+                        const [name, ...args] = msg.editorFunction;
+
+                        const method = name.split('.').reduce((prev, curr) => {
+                            return prev[curr];
+                        }, editor);
+
+                        if (!method) return;
+                        method(...args);
+                    }
+                };
+
+                // for Android
+                document.addEventListener('message', handleMessage);
+
+                // for iOS
+                window.addEventListener('message', handleMessage);
+
+                // now ready to receive messages
+                window.ReactNativeWebView.postMessage(
+                    stringifyMessage({
+                        type: 'webviewloaded',
+                    })
+                );
+            };
+
+            // Wait for page to load, then set up proxy
+            document.addEventListener('DOMContentLoaded', initEditorProxy);
+        </script>
+        <script>
+            /*__PINTURA_JS__*/
+
+            /*__PINTURA_VIDEO_JS__*/
+        </script>
+    </body>
+</html>
