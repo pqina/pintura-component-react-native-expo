@@ -148,6 +148,7 @@
                     createDefaultImageReader,
                     createDefaultImageWriter,
                     createDefaultMediaWriter,
+                    createMarkupEditorShapeStyleControls,
                     imageStateToCanvas,
                 } = pintura;
 
@@ -190,6 +191,17 @@
 
                     // is an `options` object? lets assign to editor
                     if (msg.editorOptions) {
+                        if (msg.editorOptions.markupEditorShapeStyleControls) {
+                            try {
+                                const controls = createMarkupEditorShapeStyleControls(
+                                    msg.editorOptions.markupEditorShapeStyleControls
+                                );
+                                msg.editorOptions.markupEditorShapeStyleControls = controls;
+                            } catch (err) {
+                                console.log(err.message);
+                            }
+                        }
+
                         if (msg.editorOptions.imageReader) {
                             msg.editorOptions.imageReader = createDefaultImageReader(
                                 msg.editorOptions.imageReader
