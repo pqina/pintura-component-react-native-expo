@@ -18,3 +18,5 @@ React Native Expo example projects:
 -   https://github.com/pqina/pintura-example-react-native-typescript-expo
 
 Visit https://pqina.nl/pintura for more details.
+
+Makes use of [webm-duration-fix](https://github.com/buynao/webm-duration-fix) to fix webm video duration on Chrome

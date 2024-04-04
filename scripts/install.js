@@ -57,6 +57,27 @@ data = data.replace('/*__PINTURA_JS__*/', () => contentsPinturaJS);
 
 // if pintura video extension installed
 if (contentsPinturaVideoJS) {
+    // inject webm duration fix so we don't get videos without duration on android (chrome bug)
+    const contentsWebmDurationFix = fs.readFileSync(
+        path.join('scripts', 'webm-duration-fix.min.js'),
+        {
+            encoding: 'utf8',
+        }
+    );
+    data = data.replace('/*__WEBM_DURATION_FIX_JS__*/', () => contentsWebmDurationFix);
+    data = data.replace(
+        '/*__WEBM_DURATION_FIX_APPLY__*/',
+        () => `
+// if is webm (android + chrome)
+if (value.type === 'video/webm') {
+    fixWebmDuration(value).then((blob) => {
+        // turn fixed blob into data uri
+        toDateURI(blob).then((str) => resolve([key, str]));
+    });
+    return;
+}`
+    );
+
     // inject scripts and styles
     data = data.replace('/*__PINTURA_VIDEO_CSS__*/', () => contentsPinturaVideoCSS);
     data = data.replace('/*__PINTURA_VIDEO_JS__*/', () => contentsPinturaVideoJS);

@@ -92,6 +92,7 @@
             const toMessageProp = ([key, value]) =>
                 new Promise((resolve) => {
                     if (value instanceof Blob) {
+                        /*__WEBM_DURATION_FIX_APPLY__*/
                         toDateURI(value).then((str) => resolve([key, str]));
                         return;
                     }
@@ -253,6 +254,8 @@
             /*__PINTURA_JS__*/
 
             /*__PINTURA_VIDEO_JS__*/
+
+            /*__WEBM_DURATION_FIX_JS__*/
         </script>
     </body>
 </html>
