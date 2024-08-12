@@ -51,6 +51,9 @@ const Editor = forwardRef((props, ref) => {
     const [source, setSource] = useState({});
     const webViewRef = useRef(null);
 
+    // options map used to filter out options that are set multiple times
+    const [propMap] = useState(new Map());
+
     // this sets up proxy so we can call functions on the editor instance
     useEffect(() => {
         const handler = {
@@ -72,8 +75,32 @@ const Editor = forwardRef((props, ref) => {
 
     // this passes options to the editor
     useEffect(() => {
-        webViewRef.current.postMessage(stringifyMessage({ editorOptions: options }));
+        const editorOptions = {};
+
+        for (key of Object.keys(options)) {
+            const currentValue = propMap.get(key);
+            const newValue = options[key];
+
+            // skip new value!
+            if (newValue === currentValue) {
+                continue;
+            }
+
+            // set new value
+            editorOptions[key] = newValue;
+
+            // remember this value so we can compare in next prop update
+            propMap.set(key, newValue);
+        }
+        webViewRef.current.postMessage(stringifyMessage({ editorOptions }));
     }, [webViewRef, options]);
+
+    // clear propmap on unmount
+    useEffect(() => {
+        return () => {
+            propMap.clear();
+        };
+    }, []);
 
     // this passes style rules to the editor
     useEffect(() => {
